@@ -30,11 +30,17 @@ import com.alibaba.csp.sentinel.util.AssertUtil;
 public abstract class InMemoryRuleRepositoryAdapter<T extends RuleEntity> implements RuleRepository<T, Long> {
 
     /**
+     * 集群机器规则集合：当前Sentinel Dashboard有心跳的所有机器所包含的所有规则实体。key：机器的信息；value：一个内置Map，表示该机器包含的所有规则实体；
      * {@code <machine, <id, rule>>}
      */
     private Map<MachineInfo, Map<Long, T>> machineRules = new ConcurrentHashMap<>(16);
+    /**
+     * 所有规则集合：当前Sentinel Dashboard包含的规则实体。key：规则实体id；value：规则实体
+     */
     private Map<Long, T> allRules = new ConcurrentHashMap<>(16);
-
+    /**
+     * 服务规则集合：当前Sentinel Dashboard包含所有服务所包含的规则实体。key：服务名称；value：一个内置map，表示该服务所包含的所有规则实体。
+     */
     private Map<String, Map<Long, T>> appRules = new ConcurrentHashMap<>(16);
 
     private static final int MAX_RULES_SIZE = 10000;
@@ -48,10 +54,10 @@ public abstract class InMemoryRuleRepositoryAdapter<T extends RuleEntity> implem
         if (processedEntity != null) {
             allRules.put(processedEntity.getId(), processedEntity);
             machineRules.computeIfAbsent(MachineInfo.of(processedEntity.getApp(), processedEntity.getIp(),
-                processedEntity.getPort()), e -> new ConcurrentHashMap<>(32))
-                .put(processedEntity.getId(), processedEntity);
+                            processedEntity.getPort()), e -> new ConcurrentHashMap<>(32))
+                    .put(processedEntity.getId(), processedEntity);
             appRules.computeIfAbsent(processedEntity.getApp(), v -> new ConcurrentHashMap<>(32))
-                .put(processedEntity.getId(), processedEntity);
+                    .put(processedEntity.getId(), processedEntity);
         }
 
         return processedEntity;

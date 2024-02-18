@@ -51,20 +51,26 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @RestController
 @RequestMapping(value = "/v2/flow")
-public class FlowControllerV2 {
+public class FlowRuleControllerV2 {
 
-    private final Logger logger = LoggerFactory.getLogger(FlowControllerV2.class);
+    private final Logger logger = LoggerFactory.getLogger(FlowRuleControllerV2.class);
 
+    /**
+     * 内存：存储规则的仓库。其中包含了对内存库的增删改查相关操作。
+     */
     @Autowired
     private InMemoryRuleRepositoryAdapter<FlowRuleEntity> repository;
 
     @Autowired
-    @Qualifier("flowRuleDefaultProvider")
+    @Qualifier("flowRuleNacosProvider")
     private DynamicRuleProvider<List<FlowRuleEntity>> ruleProvider;
     @Autowired
-    @Qualifier("flowRuleDefaultPublisher")
+    @Qualifier("flowRuleNacosPublisher")
     private DynamicRulePublisher<List<FlowRuleEntity>> rulePublisher;
 
+    /**
+     * 当在Sentinel Dashboard点击相应的服务名称后，就会自动提交GET提交请求。请求会将服务名称传递给方法，查询出当前服务的所有规则实体。
+     */
     @GetMapping("/rules")
     @AuthAction(PrivilegeType.READ_RULE)
     public Result<List<FlowRuleEntity>> apiQueryMachineRules(@RequestParam String app) {
@@ -82,6 +88,7 @@ public class FlowControllerV2 {
                     }
                 }
             }
+            // 将从Nacos中获取的规则实体，存储到内存规则库中
             rules = repository.saveAll(rules);
             return Result.ofSuccess(rules);
         } catch (Throwable throwable) {
@@ -134,6 +141,9 @@ public class FlowControllerV2 {
         return null;
     }
 
+    /**
+     * 创建新的流控规则，就会调用此接口进行保存
+     */
     @PostMapping("/rule")
     @AuthAction(value = AuthService.PrivilegeType.WRITE_RULE)
     public Result<FlowRuleEntity> apiAddFlowRule(@RequestBody FlowRuleEntity entity) {
@@ -149,7 +159,9 @@ public class FlowControllerV2 {
         entity.setLimitApp(entity.getLimitApp().trim());
         entity.setResource(entity.getResource().trim());
         try {
+            // 存储到内存的规则库中
             entity = repository.save(entity);
+            // push到Nacos中，进行持久化
             publishRules(entity.getApp());
         } catch (Throwable throwable) {
             logger.error("Failed to add flow rule", throwable);
@@ -160,7 +172,6 @@ public class FlowControllerV2 {
 
     @PutMapping("/rule/{id}")
     @AuthAction(AuthService.PrivilegeType.WRITE_RULE)
-
     public Result<FlowRuleEntity> apiUpdateFlowRule(@PathVariable("id") Long id,
                                                     @RequestBody FlowRuleEntity entity) {
         if (id == null || id <= 0) {
